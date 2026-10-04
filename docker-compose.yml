@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:18.3
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aye_house
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    ports:
+      - "3000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/aye_house
+      DEBUG: "true"
+      SECRET_KEY: "change-me-in-production"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:
