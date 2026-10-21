@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, NotFoundError
-from app.core.security import get_password_hash, verify_password
+from app.core.security import dummy_verify_password, get_password_hash, verify_password
 from app.features.users.models import User
 from app.features.users.repository import UserRepository
 from app.features.users.schemas import UserCreate, UserListResponse, UserResponse, UserUpdate
@@ -51,18 +51,27 @@ class UserService:
             raise NotFoundError(
                 message="User not found",
                 error_code="USER_NOT_FOUND",
-                details={"user_id": user_id},
+                details={"user_id": str(user_id)},
             )
         return UserResponse.model_validate(user)
+
+    async def get_user_by_id(self, user_id: UUID) -> User | None:
+        """Get user model by ID (for authentication)."""
+        return await self.repository.get_by_id(user_id)
 
     async def get_user_by_email(self, email: str) -> User | None:
         """Get user by email (for authentication)."""
         return await self.repository.get_by_email(email)
 
-    async def authenticate_user(self, email: str, password: str) -> User | None:
-        """Authenticate user with email and password."""
-        user = await self.repository.get_by_email(email)
+    async def authenticate_user(self, identifier: str, password: str) -> User | None:
+        """Authenticate user with email or username and password."""
+        if "@" in identifier:
+            user = await self.repository.get_by_email(identifier)
+        else:
+            user = await self.repository.get_by_username(identifier)
+
         if not user:
+            dummy_verify_password()
             return None
         if not verify_password(password, user.hashed_password):
             return None
@@ -92,7 +101,7 @@ class UserService:
             raise NotFoundError(
                 message="User not found",
                 error_code="USER_NOT_FOUND",
-                details={"user_id": user_id},
+                details={"user_id": str(user_id)},
             )
 
         # Check email uniqueness if changing
@@ -125,7 +134,7 @@ class UserService:
             raise NotFoundError(
                 message="User not found",
                 error_code="USER_NOT_FOUND",
-                details={"user_id": user_id},
+                details={"user_id": str(user_id)},
             )
 
         await self.repository.delete(user)

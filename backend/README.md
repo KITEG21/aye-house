@@ -2,6 +2,26 @@
 
 FastAPI backend with Vertical Slice Architecture.
 
+## Quick Start
+
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/) and PostgreSQL (via Docker or a
+local install; see [Setup](#setup) for both options).
+
+```bash
+# 1. Start PostgreSQL (from the repository root). Skip if you use a local PostgreSQL.
+docker pull postgres:18.3
+docker compose up -d db
+
+# 2. Install, configure, migrate and run (from backend/)
+cd backend
+uv sync --extra dev
+cp .env.example .env          # with a local PostgreSQL, edit DATABASE_URL here
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
+
+Open http://localhost:8000/docs.
+
 ## Architecture
 
 This project follows **Vertical Slice Architecture**, where features are organized as self-contained modules containing all their components (routes, handlers, models, schemas, repositories, services) rather than traditional layered architecture.
@@ -31,22 +51,57 @@ app/
 ## Requirements
 
 - Python 3.12+
-- PostgreSQL 15+
-- uv (recommended) or pip
+- [uv](https://docs.astral.sh/uv/)
+- Docker (for PostgreSQL), or a local PostgreSQL 15+ instance
 
 ## Setup
 
-1. **Clone and navigate to backend:**
+1. **Start PostgreSQL** — either with Docker or a local install.
+
+   **Option A: Docker** (from the repository root):
+   ```bash
+   docker pull postgres:18.3   # once; docker-compose.yml uses pull_policy: never
+   docker compose up -d db
+   ```
+   This creates user `postgres` / password `postgres` and database `aye_house`,
+   which matches the default `DATABASE_URL`, so no extra configuration is needed.
+
+   **Option B: Local PostgreSQL (no Docker)**
+
+   Install PostgreSQL 15+ ([Windows installer](https://www.postgresql.org/download/windows/),
+   `brew install postgresql` on macOS, `apt install postgresql` on Debian/Ubuntu) and make
+   sure the service is running. Then create a user and database with `psql`:
+   ```bash
+   psql -U postgres
+   ```
+   On Windows, if `psql` is not recognized, add `C:\Program Files\PostgreSQL\<version>\bin`
+   to your `PATH` or use the "SQL Shell (psql)" app that ships with the installer.
+   ```sql
+   CREATE USER aye_house WITH PASSWORD 'aye_house';
+   CREATE DATABASE aye_house OWNER aye_house;
+   \q
+   ```
+   Point `DATABASE_URL` in `.env` (step 3) at it:
+   ```env
+   DATABASE_URL="postgresql+asyncpg://aye_house:aye_house@localhost:5432/aye_house"
+   ```
+   The format is `postgresql+asyncpg://<user>:<password>@<host>:<port>/<database>`.
+   The `+asyncpg` driver part is required. Characters such as `@`, `:` or `/` in the
+   password must be URL-encoded (e.g. `@` → `%40`). If you'd rather reuse the
+   `postgres` superuser, just create the database (`CREATE DATABASE aye_house;`) and
+   set your own password in the URL.
+
+   Either way, the app connects on startup and fails with
+   `Connect call failed ('127.0.0.1', 5432)` if the database is not reachable.
+   Alembic reads the same `DATABASE_URL` (or `ALEMBIC_DATABASE_URL`, if set).
+
+2. **Install dependencies** (inside `backend/`):
    ```bash
    cd backend
+   uv sync --extra dev
    ```
-
-2. **Install dependencies:**
-   ```bash
-   uv sync --dev
-   # or
-   pip install -e ".[dev]"
-   ```
+   Dev tools are declared under `[project.optional-dependencies]`, so they need
+   `--extra dev`; `uv sync --dev` would uninstall them.
 
 3. **Configure environment:**
    ```bash
@@ -56,20 +111,65 @@ app/
 
 4. **Run database migrations:**
    ```bash
-   alembic upgrade head
+   uv run alembic upgrade head
    ```
 
 5. **Start development server:**
    ```bash
-   uv run fastapi dev app/main.py
-   # or
-   uvicorn app.main:app --reload
+   uv run uvicorn app.main:app --reload
    ```
+   Always prefix commands with `uv run` so they use the project's `.venv`
+   instead of the global Python. (`fastapi dev` is not available because
+   `fastapi[standard]` is not installed.)
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `uv sync --dev` uninstalls pytest, ruff, mypy… | Dev tools are an extra, not a dependency group. Use `uv sync --extra dev`. |
+| `To use the fastapi command, please install "fastapi[standard]"` | `fastapi dev` is not supported. Use `uv run uvicorn app.main:app --reload`. |
+| `uvicorn` / `alembic` not recognized, or they run from the global Python | Prefix every command with `uv run` so it uses the project's `.venv`. |
+| `Connect call failed ('127.0.0.1', 5432)` on startup | PostgreSQL is not running or `DATABASE_URL` is wrong. Start it (`docker compose up -d db` or the local service) and check `.env`. |
+| `docker compose up` fails with an image not found error | `docker-compose.yml` uses `pull_policy: never`. Run `docker pull postgres:18.3` first. |
+| `password authentication failed` | User or password in `DATABASE_URL` doesn't match PostgreSQL. URL-encode special characters in the password. |
 
 ## API Documentation
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Zones
+
+Provinces, municipalities and neighborhoods are fixed reference data: the API only
+exposes them for reading. They are defined in `app/features/zones/seed_data.py` and
+loaded with an idempotent seeder (it only inserts missing entries, so re-run it after
+editing the data file):
+
+```bash
+uv run python -m app.cli seed-zones
+```
+
+For now all provinces are loaded, but only La Habana has municipalities and neighborhoods.
+
+## Authentication
+
+JWT bearer tokens (OAuth2 password flow), passwords hashed with argon2.
+
+```bash
+# Create the first superuser (or promote an existing email); prompts for the password
+uv run python -m app.cli create-superuser --email admin@example.com --username admin
+
+# Log in with email or username (form data) to get a token
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -d "username=admin&password=<password>"
+
+# Call protected endpoints
+curl http://localhost:8000/api/v1/users/me -H "Authorization: Bearer <access_token>"
+```
+
+In Swagger UI, use the **Authorize** button to log in. Protect a route with the
+`CurrentUserDep` or `SuperUserDep` dependencies from `app/features/users/dependencies.py`.
+`SECRET_KEY` must be set when `ENVIRONMENT=production`, otherwise the app refuses to start.
 
 ## Testing
 

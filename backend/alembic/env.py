@@ -16,7 +16,9 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import get_settings
 from app.core.database import Base
+from app.features.properties.models import Property  # noqa: F401
 from app.features.users.models import User  # noqa: F401
+from app.features.zones.models import Municipality, Neighborhood, Province  # noqa: F401
 
 # This is the Alembic Config object
 config = context.config
