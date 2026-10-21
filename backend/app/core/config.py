@@ -2,7 +2,10 @@
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_SECRET_KEY = "your-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -30,7 +33,7 @@ class Settings(BaseSettings):
     database_max_overflow: int = 10
 
     # Security
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str = DEFAULT_SECRET_KEY
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
@@ -39,6 +42,13 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
+
+    @model_validator(mode="after")
+    def _require_secret_key_in_production(self) -> "Settings":
+        # Anyone knowing the default key could forge valid JWTs
+        if self.environment == "production" and self.secret_key == DEFAULT_SECRET_KEY:
+            raise ValueError("SECRET_KEY must be set in production")
+        return self
 
 
 @lru_cache

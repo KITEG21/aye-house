@@ -1,20 +1,21 @@
 """User feature dependencies."""
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_session
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import decode_access_token
 from app.features.users.models import User
 from app.features.users.service import UserService
 
-# OAuth2 scheme - URL will be resolved at runtime
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{get_settings().api_prefix}/auth/login")
 
 
 async def get_user_service(
@@ -36,13 +37,11 @@ async def get_current_user(
 
     try:
         payload = decode_access_token(token)
-        email: str | None = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError as err:
+        user_id = UUID(payload["sub"])
+    except (JWTError, KeyError, TypeError, ValueError) as err:
         raise credentials_exception from err
 
-    user = await user_service.get_user_by_email(email)
+    user = await user_service.get_user_by_id(user_id)
     if user is None:
         raise credentials_exception
 
@@ -66,8 +65,6 @@ async def get_current_superuser(
 ) -> User:
     """Get current superuser."""
     if not current_user.is_superuser:
-        from app.core.exceptions import ForbiddenError
-
         raise ForbiddenError(
             message="Not enough permissions",
             error_code="NOT_SUPERUSER",

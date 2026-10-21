@@ -1,5 +1,5 @@
 """Security utilities for password hashing and JWT."""
-import importlib.util
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -10,13 +10,8 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Password hashing
-# Use argon2 if available, otherwise fallback to bcrypt with workaround
-if importlib.util.find_spec("argon2") is not None:
-    pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-else:
-    # Fallback to bcrypt with workaround for passlib/bcrypt compatibility issue
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing (argon2 has no input length limit, unlike bcrypt's 72 bytes)
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -24,29 +19,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
+def dummy_verify_password() -> None:
+    """Spend the same time as a real verification, to avoid leaking which users exist."""
+    pwd_context.dummy_verify()
+
+
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    # bcrypt has a 72-byte limit, truncate if necessary
-    # This is a workaround for passlib/bcrypt compatibility issues
-    if len(password.encode("utf-8")) > 72:
-        password = password[:72]
     return pwd_context.hash(password)
 
 
 # JWT
 def create_access_token(
-    data: dict[str, Any],
+    subject: str,
     expires_delta: timedelta | None = None,
 ) -> str:
-    """Create a JWT access token."""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    to_encode.update({"exp": expire})
+    """Create a JWT access token for the given subject (the user ID)."""
+    expire = datetime.now(UTC) + (
+        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
+    )
     encoded_jwt: str = jwt.encode(
-        to_encode,
+        {"sub": subject, "exp": expire},
         settings.secret_key,
         algorithm=settings.algorithm,
     )

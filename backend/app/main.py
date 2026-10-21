@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.core.database import close_db, init_db
 from app.core.exceptions import AppError
-from app.features import health_router, users_router
+from app.features import auth_router, health_router, properties_router, users_router, zones_router
 
 settings = get_settings()
 
@@ -81,7 +81,10 @@ def create_app() -> FastAPI:
 
     # Include feature routers
     app.include_router(health_router, prefix=settings.api_prefix)
+    app.include_router(auth_router, prefix=settings.api_prefix)
     app.include_router(users_router, prefix=settings.api_prefix)
+    app.include_router(zones_router, prefix=settings.api_prefix)
+    app.include_router(properties_router, prefix=settings.api_prefix)
 
     return app
 
