@@ -1,0 +1,140 @@
+.property-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  transition:
+    box-shadow var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+.property-card:hover {
+  box-shadow: var(--shadow-lifted);
+  transform: translateY(-3px);
+}
+
+.property-card__media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+}
+
+.property-card__media svg {
+  width: 100%;
+  height: 100%;
+}
+
+.property-card__media .sun {
+  fill: var(--cream);
+  opacity: 0.8;
+}
+
+.property-card__media .hill {
+  fill: color-mix(in srgb, var(--cream) 55%, transparent);
+}
+
+.property-card__media .house {
+  fill: var(--cream);
+}
+
+.property-card__media .door {
+  fill: var(--sand);
+}
+
+.tone-sand {
+  background: linear-gradient(160deg, var(--color-accent-soft), var(--sand));
+}
+
+.tone-slate {
+  background: linear-gradient(160deg, var(--color-secondary-soft), var(--slate));
+}
+
+.tone-mist {
+  background: linear-gradient(160deg, var(--cream), var(--mist));
+}
+
+.property-card__badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--cream) 92%, transparent);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.property-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 22px 22px;
+}
+
+.property-card__location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.property-card__title {
+  font-size: 1.3rem;
+}
+
+.property-card__title a {
+  text-decoration: none;
+}
+
+/* Whole card is clickable through the title link */
+.property-card__title a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.property-card__type {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.property-card__features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.property-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.property-card__features svg {
+  color: var(--slate);
+}
+
+.property-card__price {
+  margin-top: auto;
+  padding-top: 14px;
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 500;
+}
+
+.property-card__price span {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
